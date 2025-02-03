@@ -50,7 +50,7 @@ def extract_ContactMap_SeqEmbedds(file_name):
 
     # Iterate through chains
     for model in structure:
-        model_id = model.get_id()
+        # model_id = model.get_id()
         for chain in model:
             chain_id = chain.get_id()
             ca_atoms = []
@@ -75,7 +75,7 @@ def extract_ContactMap_SeqEmbedds(file_name):
                             contact_map[i, j] = 1
                             contact_map[j, i] = 1
 
-                map_name = f'{pdb_id}_{model_id}_{chain_id}'
+                map_name = f'{pdb_id}_{chain_id}'
                 print(map_name)
 
                 edge_index = contact_map_to_edge_index(contact_map)
