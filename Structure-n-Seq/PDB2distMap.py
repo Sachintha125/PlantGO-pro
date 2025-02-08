@@ -12,7 +12,7 @@ import multiprocessing
 
 annot_file = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/preprocess/_annot.tsv'   ## created tsv file 
 seqres_file = './data/pdb_seqres.txt.gz'    ## from sift 
-out_dir = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/model_compare/DeepFRI/preprocessing/cmaps/' # cmap saving loc
+out_dir = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/model_compare/DeepFRI/preprocessing/cmaps/' # dist map saving loc
 cif_dir = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/structureSeq/unzipped'  # cif files loc
 n_threads = 50
 
