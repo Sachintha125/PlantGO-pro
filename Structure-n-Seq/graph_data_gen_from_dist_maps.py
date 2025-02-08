@@ -50,7 +50,8 @@ def extract_ContactMap_SeqEmbedds(npz_file_name):
     chain_id = npz_file_name.split('/')[-1].split('.')[0]
     npz = np.load(npz_file_name)
     dist_map = npz['C_alpha']
-    seq = np.array2string(npz['seqres'])
+    seq = npz['seqres']
+    seq = ''.join(seq.tolist())
     node_features = seq2protbert(seq)
     contact_map = (dist_map <= distance_threshold).astype(int)
     contact_map = torch.from_numpy(contact_map)
