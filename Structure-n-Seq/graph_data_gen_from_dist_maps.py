@@ -4,8 +4,8 @@ import os
 import numpy as np
 from torch_geometric.data import Data
 
-dist_map_dir = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/alphaFold/'
-out_dir = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/alphaFold/'
+dist_map_dir = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/model_compare/DeepFRI/preprocessing/cmaps/'
+out_dir = '/home/hpc_users/2020s17811@stu.cmb.ac.lk/structureSeq/cmap_graph_datas/'
 distance_threshold = 10.0
 
 
@@ -50,9 +50,10 @@ def extract_ContactMap_SeqEmbedds(npz_file_name):
     chain_id = npz_file_name.split('/')[-1].split('.')[0]
     npz = np.load(npz_file_name)
     dist_map = npz['C_alpha']
-    seq = npz['seqres']
+    seq = np.array2string(npz['seqres'])
     node_features = seq2protbert(seq)
     contact_map = (dist_map <= distance_threshold).astype(int)
+    contact_map = torch.from_numpy(contact_map)
     
     if contact_map.shape[0] == len(seq):
         edge_index = contact_map_to_edge_index(contact_map)
@@ -65,6 +66,6 @@ npz_file_list = [f for f in os.listdir(dist_map_dir) if os.path.isfile(os.path.j
 
 for file in npz_file_list:
     file_path = dist_map_dir + file
-    extract_ContactMap_SeqEmbedds(file_name=file_path)
+    extract_ContactMap_SeqEmbedds(npz_file_name=file_path)
     print(file, ' done ************************************\n')
 
