@@ -65,23 +65,6 @@ def load_GO_annot(filename):
     return prot2annot, goterms, gonames
 
 
-def load_EC_annot(filename):
-    """ Load EC annotations """
-    prot2annot = {}
-    ec_numbers = []
-    with open(filename, mode='r') as tsvfile:
-        reader = csv.reader(tsvfile, delimiter='\t')
-
-        # molecular function
-        next(reader, None)  # skip the headers
-        ec_numbers = next(reader)
-        next(reader, None)  # skip the headers
-        for row in reader:
-            prot, prot_ec_numbers = row[0], row[1]
-            prot2annot[prot] = [ec_num for ec_num in prot_ec_numbers.split(',')]
-    return prot2annot, ec_numbers
-
-
 def retrieve_pdb(pdb, chain, chain_seqres, pdir):
     ca, cb = make_distance_maps(pdir + '/' + pdb +'.cif', chain=chain, sequence=chain_seqres)
     return ca[chain]['contact-map'], cb[chain]['contact-map']
