@@ -1,4 +1,5 @@
 pdb chain GO terms data - https://ftp.ebi.ac.uk/pub/databases/msd/sifts/flatfiles/csv/pdb_chain_go.csv.gz
+pdb chain-uniprot mapping - https://ftp.ebi.ac.uk/pub/databases/msd/sifts/flatfiles/csv/pdb_chain_uniprot.csv.gz
 pdb chain sequennce data - https://files.rcsb.org/pub/pdb/derived_data/pdb_seqres.txt.gz
 string protein info - https://stringdb-downloads.org/download/protein.info.v12.0.txt.gz
 string speicies - https://stringdb-downloads.org/download/species.v12.0.txt
