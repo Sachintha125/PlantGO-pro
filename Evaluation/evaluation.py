@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import average_precision_score, f1_score, ConfusionMatrixDisplay
 import json
 
-save_to = 'D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\'
+save_to = 'D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\plots'
 testing_result_dir = 'D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\models\\'
 
 
@@ -25,7 +25,7 @@ def calculate_metrics(y_true, y_pred):
         y_pred_t = (y_pred > t).astype(int)
 
         # **Micro Fmax**
-        f1_micro = f1_score(y_true, y_pred_t, average='micro')
+        f1_micro = f1_score(y_true, y_pred_t, average='micro', zero_division=np.nan)
         if f1_micro > fmax_micro:
             fmax_micro, best_t_micro = f1_micro, t
 
@@ -63,4 +63,8 @@ for aspect in ['bp', 'mf', 'cc']:
     results = np.load(f'{testing_result_dir}{aspect}_testing.npz')
     y_true = results['true']
     y_hat = results['predicted']
+    probabilities = results['probabilities']
     aggregate_confusion_matrix(y_true, y_hat, aspect.upper())
+    metrics, thresholds = calculate_metrics(y_true, probabilities)
+    print(metrics, thresholds)
+    
