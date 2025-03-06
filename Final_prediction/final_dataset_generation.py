@@ -6,15 +6,17 @@ import numpy as np
 import csv
 import os 
 
-cmap_vgae_weight_file = "D:\\sachintha\\structu seq\\cmap_vgae.pt"
-ppi_vgae_embedding_dict_path = "D:\\sachintha\\ppi part\\ppi_vgae_embedds_dict.pkl"
+
+cmap_vgae_weight_file = r"D:\sachintha\structu seq\cmap_vgae.pt"
+ppi_vgae_embedding_dict_path = r"D:\sachintha\ppi part\ppi_vgae_embedds_dict.pkl"
 cmap_folder = 'D:\\sachintha\\structu seq\\cmaps\\'
-pdb_unip_id_map_dict_path = "D:\\sachintha\\prediction\\plant_unip_mapped_dict.pkl" # simple letters for pdb id 
-annot_file_path = "D:\\sachintha\\prediction\\_annot.tsv"
+sift_file_path = r"D:\sachintha\data preprocess\pdb_chain_go.csv"
+annot_file_path = r"D:\sachintha\data preprocess\_annot.tsv"
 saving_dir = 'D:\\sachintha\\prediction\\'
-train_list_file = "D:\\sachintha\\prediction\\_train.txt"
-val_list_file = "D:\\sachintha\\prediction\\_valid.txt"
-test_list_file = "D:\\sachintha\\prediction\\_test.txt"
+train_list_file = r"D:\sachintha\data preprocess\_train.txt"
+val_list_file = r"D:\sachintha\data preprocess\_valid.txt"
+test_list_file = r"D:\sachintha\data preprocess\_test.txt"
+pdb_unip_mapper_file = r'D:\sachintha\data preprocess\pdb_chain_uniprot.csv'
 
 
 class CmapEncdoer(torch.nn.Module):
@@ -85,38 +87,46 @@ def load_GO_annot(filename):
     return prot2annot, goterms, gonames
 
 
-def merge_n_label(chain_ids, cmap_folder, pdb_string_id_map_dict, prot2annot, save_file_name, input_len, label_len, aspect='biological_process', need_labeling=True):
-    cmaps = os.listdir(cmap_folder)
-    cmaps = [f.split('.')[0] for f in cmaps if os.path.isfile(os.path.join(cmap_folder, f))]
-    cmaps = set(cmaps)
-    chain_ids = set(chain_ids)
-    intersec = cmaps.intersection(chain_ids)
+def readPDBUnipMap(mapper_file_path):
+    pdb_unip_map = dict()
+    with open(mapper_file_path, 'r') as tsvfile:
+        reader = csv.reader(tsvfile, delimiter=',')
+        next(reader, None)  # skip the headers
+        next(reader, None)  # skip the headers
+        for row in reader:
+            pdb_id = row[0].strip().upper()
+            chain_id = row[1].strip()
+            unip_id = row[2].strip()
+            pdb_chain = pdb_id + '-' + chain_id
+            pdb_unip_map[pdb_chain] = unip_id
+    print('total mapped pdb chains:', len(pdb_unip_map))
+    print(list(pdb_unip_map.keys())[:5])
+    print(list(pdb_unip_map.values())[:5])
+    return pdb_unip_map # upper case pdb id 
 
+
+def merge_n_label(chain_ids:list, cmap_folder, pdb_string_id_map_dict:dict, prot2annot:dict, ppi_vgae_emb_dict:dict, save_file_name,  aspect='biological_process', need_labeling=True):
     dataset = {'input': [], 'output': []}  
     
-    for id in intersec:
-        try:
-            pdb_id = id.split('-')[0]   # capital letters 
-            if pdb_id not in pdb_string_id_map_dict.keys():
-                continue  # Skip if mapping does not exist
-            
-            string_id = pdb_string_id_map_dict[pdb_id]
-            if string_id not in ppi_vgae_embedding_dict.keys():
-                continue  # Skip if no embedding available
-            
-            data_obj = torch.load(cmap_folder + id + '.pt')
-            pooling = genPoolEmbedd(data_obj).tolist()
-            ppi = ppi_vgae_embedding_dict[string_id]
-            merged = pooling + ppi
-            
-            dataset['input'].append(merged)
-            
-            if need_labeling and id in prot2annot:
-                dataset['output'].append(prot2annot[id][aspect].tolist())
+    for id in chain_ids:
+        string_id = pdb_string_id_map_dict.get(id)
+        if string_id is not None:  
+            ppi = ppi_vgae_emb_dict.get(string_id)  
+            if ppi is not None:
+                try:    
+                    data_obj = torch.load(cmap_folder + id + '.pt')
+                    pooling = genPoolEmbedd(data_obj).tolist()            
+                    merged = pooling + ppi
+                    dataset['input'].append(merged)
+                    if need_labeling and id in prot2annot:
+                        dataset['output'].append(prot2annot[id][aspect].tolist())
+                except FileNotFoundError:
+                    print(id, '.pt not dound')
+            else:
+                print(f'{string_id} not available in vgae emb dict')
+        else:
+            print(f'{id} not availabel in id mapper')
 
-        except Exception as e:
-            print(f"Error processing {id}: {e}")
-            continue
 
     # Convert lists to tensors
     dataset['input'] = torch.tensor(dataset['input']).float()
@@ -131,10 +141,7 @@ def merge_n_label(chain_ids, cmap_folder, pdb_string_id_map_dict, prot2annot, sa
 with open(ppi_vgae_embedding_dict_path, 'rb') as f:
     ppi_vgae_embedding_dict = pickle.load(f)
 
-with open(pdb_unip_id_map_dict_path, 'rb') as f:
-    pdb_string_id_map_dict = pickle.load(f)
-pdb_string_id_map_dict = {pdb.upper():string for pdb, string in pdb_string_id_map_dict.items()}
-
+pdb_string_id_map_dict = readPDBUnipMap(pdb_unip_mapper_file)
 
 train_list, test_list, val_list = [], [], []
 with open(train_list_file, 'r') as f:
@@ -149,16 +156,16 @@ with open(val_list_file, 'r') as f:
     for line in f:
         val_list.append(line.strip())
 
-prot2annot, goterms, _=load_GO_annot(annot_file_path)
+prot2annot, _, _=load_GO_annot(annot_file_path)
 
-merge_n_label(train_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'train_dataset', 200, len(goterms['biological_process']), 'biological_process', True)
-merge_n_label(test_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'test_dataset', 200, len(goterms['biological_process']), 'biological_process', True)
-merge_n_label(val_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'val_dataset', 200, len(goterms['biological_process']), 'biological_process', True)
+merge_n_label(train_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'train_dataset',  'biological_process', True)
+merge_n_label(test_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'test_dataset',  'biological_process', True)
+merge_n_label(val_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'val_dataset', 'biological_process', True)
 
-merge_n_label(train_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'train_dataset', 200, len(goterms['molecular_function']), 'molecular_function', True)
-merge_n_label(test_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'test_dataset', 200, len(goterms['molecular_function']), 'molecular_function', True)
-merge_n_label(val_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'val_dataset', 200, len(goterms['molecular_function']), 'molecular_function', True)
+merge_n_label(train_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'train_dataset',  'molecular_function', True)
+merge_n_label(test_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'test_dataset', 'molecular_function', True)
+merge_n_label(val_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'val_dataset', 'molecular_function', True)
 
-merge_n_label(train_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'train_dataset', 200, len(goterms['cellular_component']), 'cellular_component', True)
-merge_n_label(test_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'test_dataset', 200, len(goterms['cellular_component']), 'cellular_component', True)
-merge_n_label(val_list, cmap_folder, pdb_string_id_map_dict, prot2annot, 'val_dataset', 200, len(goterms['cellular_component']), 'cellular_component', True)
+merge_n_label(train_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'train_dataset',  'cellular_component', True)
+merge_n_label(test_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'test_dataset', 'cellular_component', True)
+merge_n_label(val_list, cmap_folder, pdb_string_id_map_dict, prot2annot, ppi_vgae_embedding_dict,'val_dataset', 'cellular_component', True)

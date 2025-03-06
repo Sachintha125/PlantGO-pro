@@ -6,8 +6,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
-datatsets_dir = 'D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\'
-output_dir = 'D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\'
+datatsets_dir = 'D:\\sachintha\\prediction\\'
+output_dir = 'D:\\sachintha\\prediction\\'
 
 
 class ProteinDataset(Dataset):
@@ -77,47 +77,48 @@ def calculate_accuracy(predictions, labels, threshold=0.5):
 
 
 def train_model(model, inputs, labels, criterion, optimizer):
-    global train_accuracies, train_losses
+    # global train_accuracies, train_losses
     model.train()  
     optimizer.zero_grad()
     outputs = model(inputs)
     # loss = criterion(outputs, labels)
     loss = criterion(outputs.sigmoid(), labels)
-    train_losses = train_losses + [loss.item()]
+    # train_losses = train_losses + [loss.item()]
     loss.backward()
     optimizer.step()
 
     probabilities = outputs.sigmoid()  
     accuracy = calculate_accuracy(probabilities.detach().numpy(), labels.numpy())
-    train_accuracies = train_accuracies + [accuracy]
-    return loss.item(), accuracy 
+    # train_accuracies = train_accuracies + [accuracy]
+    return loss.item(), accuracy  
 
 
 def test_model(model, inputs, labels, criterion, validation = False):
-    global test_accuracies, test_losses, val_accuracies, val_losses
+    # global test_accuracies, test_losses, val_accuracies, val_losses
     model.eval()  
 
     with torch.no_grad():  
         outputs = model(inputs)
         # loss = criterion(outputs, labels)
         loss = criterion(outputs.sigmoid(), labels)
-        if validation:
-            val_losses = val_losses + [loss.item()]
-        else:
-            test_losses = test_losses + [loss.item()]
+        # if validation:
+        #     val_losses = val_losses + [loss.item()]
+        # else:
+        #     test_losses = test_losses + [loss.item()]
 
     probabilities = outputs.sigmoid()
     accuracy = calculate_accuracy(probabilities.numpy(), labels.numpy())
-    if validation:
-        val_accuracies = val_accuracies + [accuracy]
-    else:
-        test_accuracies = test_accuracies + [accuracy]
+    # if validation:
+    #     val_accuracies = val_accuracies + [accuracy]
+    # else:
+    #     test_accuracies = test_accuracies + [accuracy]
 
     return loss.item(), accuracy
 
 
+
 class EarlyStopping:
-    def __init__(self, aspect, patience=5, delta=0,path='D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\best'):
+    def __init__(self, aspect, patience=5, delta=0,path='D:\\sachintha\\prediction\\'):
         """
         Args:
             patience (int): How many epochs to wait before stopping if no improvement.
@@ -127,18 +128,21 @@ class EarlyStopping:
         self.patience = patience
         self.delta = delta
         self.path = path
-        self.best_val_acc = 0 
+        self.best_val_loss = float('inf') 
         self.epochs_no_improve = 0
         self.early_stop = False
         self.aspect = aspect
 
-    def __call__(self, val_acc, model):
-        if val_acc > self.best_val_acc + self.delta:  # AUC should increase
-            self.best_val_acc = val_acc
+    def __call__(self, val_loss, model):
+        if val_loss < self.best_val_loss - self.delta: 
+            self.best_val_loss = val_loss
             self.epochs_no_improve = 0
-            torch.save(model.state_dict(), f'{self.path}_{self.aspect}.pt')  # Save best model
+            torch.save(model.state_dict(), f'{self.path}{self.aspect}_best.pt')  # Save best model
+            print("Model improved, saving...")
+
         else:
             self.epochs_no_improve += 1
+            print(f"No improvement for {self.epochs_no_improve} epochs.")
             if self.epochs_no_improve >= self.patience:
                 self.early_stop = True
 
@@ -202,8 +206,13 @@ for aspect in ['bp', 'mf', 'cc']:
                 f"Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}, "
                 # f"Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.4f}, " 
                 f"Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}")
-                
-        early_stopping(val_accuracy, model)
+        
+        train_accuracies.append(train_accuracy)
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+        val_accuracies.append(val_accuracy)
+
+        early_stopping(val_loss, model)
         if early_stopping.early_stop:
             print("Early stopping triggered!")
             break
@@ -215,7 +224,11 @@ for aspect in ['bp', 'mf', 'cc']:
     with torch.no_grad():
         outputs = best_model(testX_std).sigmoid().numpy()
     predicted_labels = (outputs > 0.5).astype(int)
-
+    testing_results = {'true': true_labels,
+                        'predicted': predicted_labels,
+                        'probabilities': outputs}
+    np.savez(f'{output_dir}{aspect}_testing.npz', **testing_results)
+    
     y_true_flat = true_labels.ravel()
     y_pred_flat = outputs.ravel()
 
@@ -231,10 +244,10 @@ for aspect in ['bp', 'mf', 'cc']:
     plt.plot(recall_all, precision_all,  lw=2, label=f'AUC = {pr_auc_all:.2f}')
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.title(f'Overall Precision-Recall Curve for Multi-label Classification - {aspect_dict[aspect]}')
+    plt.title(f'Overall PR Curve for Multi-label Classification - {aspect_dict[aspect]}')
     plt.legend(loc="lower left")
     plt.tight_layout()
-    plt.savefig(f'{output_dir}{aspect}_pr.png', dpi=300.0)
+    plt.savefig(f'{output_dir}{aspect}_pr_tuned.png', dpi=300.0)
 
     # Plot combined ROC
     plt.figure(figsize=(8, 6))
@@ -245,7 +258,7 @@ for aspect in ['bp', 'mf', 'cc']:
     plt.title(f'Overall ROC Curve for Multi-label classification - {aspect_dict[aspect]}')
     plt.legend(loc="lower right")
     plt.tight_layout()
-    plt.savefig(f'{output_dir}{aspect}_roc.png', dpi=300.0)
+    plt.savefig(f'{output_dir}{aspect}_roc_tuned.png', dpi=300.0)
 
     ## loss and acc 
     epochs = range(1, len(train_losses) + 1)
@@ -256,13 +269,13 @@ for aspect in ['bp', 'mf', 'cc']:
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig(f'{output_dir}{aspect}_loss.png', dpi=300.0)
+    plt.savefig(f'{output_dir}{aspect}_loss_tuned.png', dpi=300.0)
 
     plt.figure()
     plt.plot(epochs, train_accuracies, 'b', label='Training Accuracy')
     plt.plot(epochs, val_accuracies, 'r', label='Validation Accuracy')
-    plt.title('Training and Validation Loss')
+    plt.title('Training and Validation Accuracy')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig(f'{output_dir}{aspect}_acc.png', dpi=300.0)
+    plt.savefig(f'{output_dir}{aspect}_acc_tuned.png', dpi=300.0)

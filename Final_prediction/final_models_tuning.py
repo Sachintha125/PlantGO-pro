@@ -6,8 +6,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
-datatsets_dir = 'D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\'
-output_dir = 'D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\'
+datatsets_dir = 'D:\\sachintha\\prediction\\'
+output_dir = 'D:\\sachintha\\prediction\\'
 
 
 class ProteinDataset(Dataset):
@@ -117,7 +117,7 @@ def test_model(model, inputs, labels, criterion, validation = False):
 
 
 class EarlyStopping:
-    def __init__(self, patience=5, delta=0, path='D:\\year 4\\semester 1\\BT\\BT 4033\\prediction\\best.pt'):
+    def __init__(self, patience=5, delta=0, path='D:\\sachintha\\prediction\\best.pt'):
         """
         Args:
             patience (int): How many epochs to wait before stopping if no improvement.
@@ -127,17 +127,20 @@ class EarlyStopping:
         self.patience = patience
         self.delta = delta
         self.path = path
-        self.best_val_acc = 0 
+        self.best_val_loss = float('inf') 
         self.epochs_no_improve = 0
         self.early_stop = False
 
-    def __call__(self, val_acc, model):
-        if val_acc > self.best_val_acc + self.delta:  # AUC should increase
-            self.best_val_acc = val_acc
+    def __call__(self, val_loss, model):
+        if val_loss < self.best_val_loss - self.delta: 
+            self.best_val_loss = val_loss
             self.epochs_no_improve = 0
             torch.save(model.state_dict(), self.path)  # Save best model
+            print("Model improved, saving...")
+
         else:
             self.epochs_no_improve += 1
+            print(f"No improvement for {self.epochs_no_improve} epochs.")
             if self.epochs_no_improve >= self.patience:
                 self.early_stop = True
 
@@ -173,7 +176,7 @@ for aspect in ['bp', 'mf', 'cc']:
     class_weights = calc_class_weights(train_data['output'])
     trainX_std, valX_std, testX_std = standadize_inputs(train_data['input'], val_data['input'], test_data['input'])
     dataset = ProteinDataset(trainX_std, train_data['output'])
-    dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     # criterion = nn.BCEWithLogitsLoss(pos_weight=class_weights)
 
@@ -197,15 +200,15 @@ for aspect in ['bp', 'mf', 'cc']:
             for epoch in range(num_epochs):
                 for batch_inputs, batch_outputs in dataloader:
                     train_loss, train_accuracy = train_model(model, batch_inputs, batch_outputs.to(torch.float), criterion, optimizer)
-                    test_loss, test_accuracy = test_model(model, testX_std, test_data['output'], criterion)
+                    # test_loss, test_accuracy = test_model(model, testX_std, test_data['output'], criterion)
                     val_loss, val_accuracy = test_model(model, valX_std, val_data['output'], criterion, validation= True)
 
                 print(f"Epoch {epoch}, "
                             f"Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}, "
-                            f"Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.4f}, " 
+                            # f"Test Loss: {test_loss:.4f}, Test Acc: {test_accuracy:.4f}, " 
                             f"Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}")
                 
-                early_stopping(val_accuracy, model)
+                early_stopping(val_loss, model)
                 if early_stopping.early_stop:
                     print("Early stopping triggered!")
                     break
@@ -237,7 +240,7 @@ for aspect in ['bp', 'mf', 'cc']:
         plt.plot(pr[0], pr[1],  lw=2, label=f'AUC = {pr[2]:.2f} no.dense layers {pr[3]+1} lr = {pr[4]}')
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.title(f'Overall Precision-Recall Curve for Multi-label Classification - {aspect_dict[aspect]}')
+    plt.title(f'Overall PR Curve for Multi-label Classification - {aspect_dict[aspect]}')
     plt.legend(loc="lower left")
     plt.savefig(f'{output_dir}{aspect}_pr.png', dpi=300.0)
 
