@@ -1,2 +1,2 @@
-# PFP-pro
-Multi-model approach for Protein function prediction using protein sequence, structure and PPI networks
+# PlantGO
+Multi-model approach for plant specific protein function prediction using protein sequence, structure and PPI networks
